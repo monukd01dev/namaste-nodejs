@@ -37,6 +37,25 @@ app.use('/api/connect', (req, res) => {
     return res.send('Successfully connected with another developer!')
 })
 
+
+// =========================================================
+// EPISODE 5 PRACTICE: Routing, Params, and Queries
+// =========================================================
+app.get(['/api/feed','/api/feeds'],(req,res)=>{
+    return res.send("Here is your devTinder feed dev in your area")
+})
+
+app.get('/api/v1/profile/:devId',(req,res)=>{
+    const {devId} = req.params;
+    return res.send(`[devTinder] Loading full profile for devID : ${devId}`)
+})
+
+app.get('/api/v1/query-params',(req,res)=>{
+    const queryParams = req.query;
+    return res.json(queryParams)
+})
+
+
 // ---------------------------------------------------------
 // Station with specific route only for checking the global error handler
 // ---------------------------------------------------------

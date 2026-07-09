@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express()
 const PORT = 8080
-//put all the app.use below
+const {userAuth,adminAuth} = require('./middlewares')
 
 // ---------------------------------------------------------
 // STATION 1: The Global Logger
@@ -15,59 +15,43 @@ app.use((req, res, next) => {
     return next()
 })
 
-//ab jo main next kiya tha vo is neeche wale ko kiya tha 
-// ---------------------------------------------------------
-// STATION 2: The Dev-Only Security Gate
-// This only runs for routes starting with /api/connect
-// ---------------------------------------------------------
-app.use('/api/connect', (req, res, next) => {
-    const isVerified = true;
-    if (!isVerified)
-        return res.status(402).send("Access Denied: devTinder is for developers only!")
+//! Episode 6 Code starts here 
+// TODO define the admin route here 
+    app.use('/api/v1/admin',adminAuth)
+// TODO define 2 admin sub routes here
+    app.all('/api/v1/admin/sales',(req,res)=>{
+        return res.send('Here is you all saled data')
+    })
 
-    console.log("[LOG] User verified. Passing to the route handler...");
-    return next()
-})
+    app.get('/api/v1/admin/users', (req,res)=> {
+        return res.send("Here is you all users data")
+    })
 
+// TODO define the user route here 
+    app.use('/api/v1/user',userAuth)
+// TODO define 2 user sub routes here 
+    app.post('/api/v1/user/login/:id/:pass',(req,res)=>{
+        return res.status(200).json({
+            "success" : true,
+            "data" : req.params,
+            "error" : {},
+            "message" : "User login successfully"
+        })
+    })
+    app.post('/api/v1/user/signup/:id/:pass',(req,res)=>{
+        return res.status(200).json({
+            "success" : true,
+            "data" : req.params,
+            "error" : {},
+            "message" : "User signup successfully"
+        })
+    })
 
-// ---------------------------------------------------------
-// STATION 3: The Final Route Handler
-// ---------------------------------------------------------
-app.use('/api/connect', (req, res) => {
-    return res.send('Successfully connected with another developer!')
-})
+    app.get('/api/v1/user/profile',(req,res)=>{
+        return res.send("this is you profile after successfull userAuth middleware")
+    })
 
-
-// =========================================================
-// EPISODE 5 PRACTICE: Routing, Params, and Queries
-// =========================================================
-app.get(['/api/feed','/api/feeds'],(req,res)=>{
-    return res.send("Here is your devTinder feed dev in your area")
-})
-
-app.get('/api/v1/profile/:devId',(req,res)=>{
-    const {devId} = req.params;
-    return res.send(`[devTinder] Loading full profile for devID : ${devId}`)
-})
-
-app.get('/api/v1/query-params',(req,res)=>{
-    const queryParams = req.query;
-    return res.json(queryParams)
-})
-
-
-// ---------------------------------------------------------
-// Station with specific route only for checking the global error handler
-// ---------------------------------------------------------
-app.use('/error-checking',(req,res,next)=>{
-    //my sole purpose is to run the 4 argument app.use handler method 
-    try{
-        throw new Error('Man Made Error')
-    }
-    catch(err){
-        return next(err)
-    }
-})
+//! Episode 6 Code ends here 
 
 // ---------------------------------------------------------
 // STATION for checking the server status on the client side
@@ -106,35 +90,4 @@ app.listen(PORT, function listenCallback() {
     console.log(`[DEV LOG] : App is up and running on PORT ${PORT}`)
 })
 
-//mai thoda flow flow me aage chala gya lekin thodi cheeje google kar lena tum log 
 
-/**
- * ============================================================================
- * devTinder Backend - Express Middleware & Routing Flow (Episode 4)
- * ============================================================================
- * * Yeh file Express.js ke "Conveyor Belt" (Middleware) architecture ko implement
- * karti hai. Har incoming request top-to-bottom travel karti hai jab tak use 
- * koi response (res.send) na mil jaye, ya koi error throw na ho.
- * * THE REQUEST LIFECYCLE:
- * * 1. Global Logger (app.use): 
- * Har request yahan se guzarti hai. Yeh request method aur path ko log 
- * karta hai (ignoring favicon) aur `return next()` ke through aage bhejta hai.
- * * 2. Security Gate (/api/connect): 
- * Specific middleware jo sirf dev verification check karta hai. Agar user
- * verified nahi hai, toh yahin se 402 Unauthorized bhej kar request rok deta hai.
- * * 3. Final Handlers (/api/connect, /info): 
- * Agar request yahan tak pohochi aur path match hua, toh yeh actual business 
- * logic execute karke response bhejte hain. Yahan aakar safar khatam hota hai.
- * * 4. Error Simulator (/error-checking): 
- * Yeh route intentionally `throw new Error()` karta hai aur `next(err)` 
- * ko call karke request ko seedha "Emergency Department" (Error Handler) 
- * mein drop kar deta hai. Baki sab routes skip ho jate hain.
- * * 5. 404 Catch-All Wildcard (app.use): 
- * Agar upar diya gaya koi bhi path match NAHI hua, toh request girti girti 
- * yahan aayegi. Yeh route user ko ek clean 404 "Galat gali" JSON message dega.
- * * 6. Global Error Handler (app.use with 4 arguments): 
- * Yeh pure app ka safety net hai. Agar kisi bhi upar wale route mein code 
- * fatt gaya aur `next(err)` call hua, toh yeh handler us ugly stack trace 
- * ko intercept karke frontend ko ek clean 500 Internal Server Error JSON bhejta hai.
- * ============================================================================
- */

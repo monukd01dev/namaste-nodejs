@@ -1,7 +1,10 @@
+require('dotenv').config()
+
 const express = require('express')
 const app = express()
-const PORT = 8080
-const {userAuth,adminAuth} = require('./middlewares')
+const { dbConnect } = require('./config')
+const { User } = require('./models')
+const PORT = process.env.PORT
 
 // ---------------------------------------------------------
 // STATION 1: The Global Logger
@@ -15,48 +18,56 @@ app.use((req, res, next) => {
     return next()
 })
 
-//! Episode 6 Code starts here 
-// TODO define the admin route here 
-    app.use('/api/v1/admin',adminAuth)
-// TODO define 2 admin sub routes here
-    app.all('/api/v1/admin/sales',(req,res)=>{
-        return res.send('Here is you all saled data')
-    })
+//! Episode 7 Code starts here 
+//TODO create an api route to handle /signup request
+app.post('/api/v1/signup', async (req, res) => {
+    try {
+        const dummyUser = {
+            "firstName": "Priya",
+            "emailId": "priya.react@example.com",
+            "password": "Secure#9876",
+            "age": 27,
+            "gender": "female"
+        }
+        //paihle model ka instance banana hota hai fir hum instance ke method se use save karte hai 
+        // const data = await User.save(dummyUser);
+        const user = new User(dummyUser);
+        const savedUser = await user.save();
+        return res.status(201).json({
+            success: true,
+            message: 'User created successfully!',
+            data: savedUser,
+            error: null
 
-    app.get('/api/v1/admin/users', (req,res)=> {
-        return res.send("Here is you all users data")
-    })
+        });
+    } catch (error) {
+        console.log(`[SIGNUP LOG ERROR] : `, error.message)
 
-// TODO define the user route here 
-    app.use('/api/v1/user',userAuth)
-// TODO define 2 user sub routes here 
-    app.post('/api/v1/user/login/:id/:pass',(req,res)=>{
-        return res.status(200).json({
-            "success" : true,
-            "data" : req.params,
-            "error" : {},
-            "message" : "User login successfully"
+        //for mongoose validation error 
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid data provided!",
+                data: null,
+                error: error.message
+            })
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Oops! Something went wrong on the server.",
+            data: null,
+            error: error.message
         })
-    })
-    app.post('/api/v1/user/signup/:id/:pass',(req,res)=>{
-        return res.status(200).json({
-            "success" : true,
-            "data" : req.params,
-            "error" : {},
-            "message" : "User signup successfully"
-        })
-    })
+    }
+})
 
-    app.get('/api/v1/user/profile',(req,res)=>{
-        return res.send("this is you profile after successfull userAuth middleware")
-    })
-
-//! Episode 6 Code ends here 
+//! Episode 7 Code ends here 
 
 // ---------------------------------------------------------
 // STATION for checking the server status on the client side
 // ---------------------------------------------------------
-app.use('/info',(req,res)=>{
+app.use('/info', (req, res) => {
     return res.send('Sever is up and running brother')
 })
 
@@ -64,7 +75,7 @@ app.use('/info',(req,res)=>{
 // STATION: 404 Catch-All (Wildcard Route)
 // Agar upar wala koi bhi route match nahi hua, toh request yahan giregi.
 // ---------------------------------------------------------
-app.use( (req, res) => {
+app.use((req, res) => {
     return res.status(404).json({
         success: false,
         message: "Route not found. Tum galat gali me aa gaye ho bhai!"
@@ -84,10 +95,30 @@ app.use((err, req, res, next) => {
     })
 })
 
+//! Episode 7 Code starts here 
 
-//put the app.listen() below
-app.listen(PORT, function listenCallback() {
-    console.log(`[DEV LOG] : App is up and running on PORT ${PORT}`)
-})
+async function main() {
+    try {
+        await dbConnect(); //jaisa ke hume pata hai humne error throw kar diya tha dbConnect function ke try catch me to to yaha aaega vo error agar dbConnect ne kuch bhi error aya to
+        app.listen(PORT, () => {
+            console.log(`[SERVER LOG] : App is up and running on PORT ${PORT}`)
+        })
+    } catch (error) {
+        // console.log(`[SERVER LOG] : Failed to start server on PORT ${PORT} `, error.message) //ye main isliye hata diya kyonki error.message me redundancy ho rahi thi db ke problem to mai pahle he log kar chuka tha dbConnect() function me 
+        console.log(`[SERVER LOG ERROR] : Server startup aborted due to database connection failure.`)
+
+        //log which have redundancy 
+        // [DB LOG ERROR] : Database connection failed! bad auth : Authentication failed.
+        // [SERVER LOG] : Failed to start server on PORT 8080  bad auth : Authentication failed.
+        //log after
+        // [DB LOG ERROR] : Database connection failed! bad auth : Authentication failed.
+        // [SERVER LOG ERROR] : Server startup aborted due to database connection failure.
+
+    }
+}
+
+main()
+//! Episode 7 Code ends here 
+
 
 

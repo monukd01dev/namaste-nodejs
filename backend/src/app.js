@@ -6,6 +6,13 @@ const { dbConnect } = require('./config')
 const { User } = require('./models')
 const PORT = process.env.PORT
 
+//TODO add the midderware that read the json from request body and convert it to the js object and put it in the req.body
+//! As we know that order matter in the express that why we put this middleware at the top of the file 
+// Middleware: Har request yahan se guzregi. 
+// Ye incoming JSON string ko pakdega, JS Object me parse karega, aur req.body me daal dega.
+app.use(express.json()) // pata hai na vo yaha koe route kyon nhi specify kiya cause we want every request to go through it same like we have did in the STATION 1
+
+
 // ---------------------------------------------------------
 // STATION 1: The Global Logger
 // This runs for EVERY single request that hits the server.
@@ -18,21 +25,17 @@ app.use((req, res, next) => {
     return next()
 })
 
-//! Episode 7 Code starts here 
+//! Episode 8 Code starts here 
 //TODO create an api route to handle /signup request
 app.post('/api/v1/signup', async (req, res) => {
+
+    const newUser = req.body;
     try {
-        const dummyUser = {
-            "firstName": "Priya",
-            "emailId": "priya.react@example.com",
-            "password": "Secure#9876",
-            "age": 27,
-            "gender": "female"
-        }
-        //paihle model ka instance banana hota hai fir hum instance ke method se use save karte hai 
-        // const data = await User.save(dummyUser);
-        const user = new User(dummyUser);
+        //*paihle model ka instance banana hota hai fir hum instance ke method se use save karte hai 
+        //* const data = await User.save(dummyUser);
+        const user = new User(newUser);
         const savedUser = await user.save();
+
         return res.status(201).json({
             success: true,
             message: 'User created successfully!',
@@ -62,12 +65,202 @@ app.post('/api/v1/signup', async (req, res) => {
     }
 })
 
-//! Episode 7 Code ends here 
+// TODO Get method to get user with the user email cause email is also unique usind _id is not the food option here 
+//? get router creation.md pad lena theek hai usme sahi se explain kiya hua hai 
+
+app.get('/api/v1/user', async (req, res) => {
+
+    try {
+        const email = req.body?.emailId;
+        //*checking the email from req
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "emailId is required",
+                data: null
+            })
+        }
+        //doing the db operation to find user 
+        const user = await User.findOne({ "emailId": email }).select('-_id -password')
+
+        //second check 
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: `User not found with email id : ${email}`,
+                data: null
+            })
+        }
+
+        //final response sending when we got the user details  
+        return res.status(200).json({
+            success: true,
+            message: `User found with email id : ${email}`,
+            data: user
+        })
+
+    }
+    catch (error) {
+        console.log('[USER GET ERROR]: from the catch block : ', error.message)
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong on our side!!",
+            data: null,
+            error: error.message
+        })
+    }
+})//tested and working
+
+// TODO patch method to update the whitelisted fields not unique and restricted attributes like phone and password and email
+//* read the patch route creation .md file otherwise fof!
+
+app.patch('/api/v1/user', async (req, res) => {
+    try {
+        //* PHASE 0 sanitizing the data and extracting the critical fields
+        const { emailId, password, ...safeFields } = req.body
+
+        //* PHASE 1 finding and ensuring the filter for findOne
+        if (!emailId) {
+            return res.status(400).json({
+                success: false,
+                message: "emailId is required for update"
+            })
+        }
+        //* PHASE 2 whitelisting the fields 
+        const whiteListedFields = ['firstName', 'lastName', 'age', 'gender'];
+        //here we are ensuring that every key/field send by the user is whiteListedField or not
+        const isUpdateAllowed = Object.keys(safeFields).every(key => whiteListedFields.includes(key))
+
+        if (!isUpdateAllowed) {
+            const restrictedFields = Object.keys(safeFields).filter(key => !whiteListedFields.includes(key))
+            return res.status(400).json({
+                success: false,
+                message: "update not done!!",
+                error: `These fields are unknow or not allowed : [ ${restrictedFields} ]`
+            })
+        }
+
+        //* PHASE 3 performing the actual update 
+        const updatedUser = await User.findOneAndUpdate({ "emailId": emailId }, safeFields, { "returnDocument": "after", "runValidators": true }).select('-_id -password')
+        // sending the not found response 
+        if (!updatedUser) {
+            return res.status(404).send({
+                success: false,
+                message: "User not found!"
+            });
+        }
+
+        //* PHASE 4 sending the final response
+        return res.status(200).json({
+            success: true,
+            message: "user updated successfully!",
+            data: updatedUser
+        })
+
+
+    } catch (error) {
+
+        //for mongoose validation error 
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid data provided!",
+                data: null,
+                error: error.message
+            })
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Oops! Something went wrong on the server.",
+            data: null,
+            error: error.message
+        })
+    }
+})
+
+//TODO delete route with delete method basically it will take the email from the request body and with that it will findOneAndDelete
+//* read the delete route creation .md file otherwise fof!
+app.delete('/api/v1/user', async (req, res) => {
+    try {
+
+        const email = req.body?.emailId;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Delete operation cannot be performed",
+                error: "emailId is required to delete",
+                data: null
+            })
+        }
+
+        const deletedUser = await User.findOneAndDelete({"emailId" : email}).select('-password');
+
+        if(!deletedUser){
+            return res.status(404).json({
+                success : false,
+                message: 'user not founded to be deleted',
+                data : null,
+                error : `user doesn't exist's with EmailId : ${email}`
+            })
+        }
+
+        return res.status(200).json({
+            success: true,
+            message : `User with EmailId : ${email} is deleted successfully!!`,
+            data : deletedUser,
+            error : null
+        })
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message: 'something went wrong on our side',
+            data: null,
+            error: error.message
+        })
+    }
+})
+
+//TODO Feed route to get all users
+app.get('/api/v1/feed', async (req,res)=>{
+    try {
+        const feed = await User.find({}).select('-_id -password -__v -createdAt -updatedAt')
+        if(feed.length === 0){
+            return res.status(404).json({
+                success : false,
+                message : 'collections is empty',
+                data : null
+            })
+        }
+
+        return res.status(200).json({
+                success : true,
+                totalUsers : feed.length,
+                message : 'all user fetched successfully',
+                data : feed
+            })
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message: 'something went wrong on our side',
+            data: null,
+            error: error.message
+        })
+    }
+})
+
+
+//! Episode 8 Code ends here 
 
 // ---------------------------------------------------------
 // STATION for checking the server status on the client side
 // ---------------------------------------------------------
-app.use('/info', (req, res) => {
+app.use('/api/v1/info', (req, res) => {
     return res.send('Sever is up and running brother')
 })
 
@@ -95,7 +288,7 @@ app.use((err, req, res, next) => {
     })
 })
 
-//! Episode 7 Code starts here 
+
 
 async function main() {
     try {
@@ -118,7 +311,7 @@ async function main() {
 }
 
 main()
-//! Episode 7 Code ends here 
+
 
 
 

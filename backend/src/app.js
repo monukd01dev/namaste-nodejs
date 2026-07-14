@@ -4,6 +4,7 @@ const express = require('express')
 const app = express()
 const { dbConnect } = require('./config')
 const { User } = require('./models')
+const { signupValidator, validateEditProfileData} = require('./utils/validators')
 const PORT = process.env.PORT
 
 //TODO add the midderware that read the json from request body and convert it to the js object and put it in the req.body
@@ -25,12 +26,15 @@ app.use((req, res, next) => {
     return next()
 })
 
-//! Episode 8 Code starts here 
+
 //TODO create an api route to handle /signup request
 app.post('/api/v1/signup', async (req, res) => {
 
-    const newUser = req.body;
     try {
+
+        const newUser = signupValidator(req.body)
+
+
         //*paihle model ka instance banana hota hai fir hum instance ke method se use save karte hai 
         //* const data = await User.save(dummyUser);
         const user = new User(newUser);
@@ -116,41 +120,29 @@ app.get('/api/v1/user', async (req, res) => {
 
 app.patch('/api/v1/user', async (req, res) => {
     try {
-        //* PHASE 0 sanitizing the data and extracting the critical fields
+
         const { emailId, password, ...safeFields } = req.body
 
-        //* PHASE 1 finding and ensuring the filter for findOne
-        if (!emailId) {
+        const cleanUpdates = validateEditProfileData(safeFields)
+        
+        // 🚀 THE FIX: Prevent Useless DB Calls
+        if (Object.keys(cleanUpdates).length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "emailId is required for update"
-            })
+                message: "No valid fields provided for update."
+            });
         }
-        //* PHASE 2 whitelisting the fields 
-        const whiteListedFields = ['firstName', 'lastName', 'age', 'gender'];
-        //here we are ensuring that every key/field send by the user is whiteListedField or not
-        const isUpdateAllowed = Object.keys(safeFields).every(key => whiteListedFields.includes(key))
-
-        if (!isUpdateAllowed) {
-            const restrictedFields = Object.keys(safeFields).filter(key => !whiteListedFields.includes(key))
-            return res.status(400).json({
-                success: false,
-                message: "update not done!!",
-                error: `These fields are unknow or not allowed : [ ${restrictedFields} ]`
-            })
-        }
-
-        //* PHASE 3 performing the actual update 
-        const updatedUser = await User.findOneAndUpdate({ "emailId": emailId }, safeFields, { "returnDocument": "after", "runValidators": true }).select('-_id -password')
+        //* performing the actual update 
+        const updatedUser = await User.findOneAndUpdate({ "emailId": emailId }, cleanUpdates, { "returnDocument": "after", "runValidators": true }).select('-_id -password')
         // sending the not found response 
         if (!updatedUser) {
             return res.status(404).send({
                 success: false,
-                message: "User not found!"
+                message: "Invalid credentials!"
             });
         }
 
-        //* PHASE 4 sending the final response
+        //*  sending the final response
         return res.status(200).json({
             success: true,
             message: "user updated successfully!",
@@ -195,22 +187,22 @@ app.delete('/api/v1/user', async (req, res) => {
             })
         }
 
-        const deletedUser = await User.findOneAndDelete({"emailId" : email}).select('-password');
+        const deletedUser = await User.findOneAndDelete({ "emailId": email }).select('-password');
 
-        if(!deletedUser){
+        if (!deletedUser) {
             return res.status(404).json({
-                success : false,
+                success: false,
                 message: 'user not founded to be deleted',
-                data : null,
-                error : `user doesn't exist's with EmailId : ${email}`
+                data: null,
+                error: `user doesn't exist's with EmailId : ${email}`
             })
         }
 
         return res.status(200).json({
             success: true,
-            message : `User with EmailId : ${email} is deleted successfully!!`,
-            data : deletedUser,
-            error : null
+            message: `User with EmailId : ${email} is deleted successfully!!`,
+            data: deletedUser,
+            error: null
         })
 
     } catch (error) {
@@ -225,23 +217,23 @@ app.delete('/api/v1/user', async (req, res) => {
 })
 
 //TODO Feed route to get all users
-app.get('/api/v1/feed', async (req,res)=>{
+app.get('/api/v1/feed', async (req, res) => {
     try {
         const feed = await User.find({}).select('-_id -password -__v -createdAt -updatedAt')
-        if(feed.length === 0){
+        if (feed.length === 0) {
             return res.status(404).json({
-                success : false,
-                message : 'collections is empty',
-                data : null
+                success: false,
+                message: 'collections is empty',
+                data: null
             })
         }
 
         return res.status(200).json({
-                success : true,
-                totalUsers : feed.length,
-                message : 'all user fetched successfully',
-                data : feed
-            })
+            success: true,
+            totalUsers: feed.length,
+            message: 'all user fetched successfully',
+            data: feed
+        })
 
     } catch (error) {
 
@@ -255,7 +247,7 @@ app.get('/api/v1/feed', async (req,res)=>{
 })
 
 
-//! Episode 8 Code ends here 
+
 
 // ---------------------------------------------------------
 // STATION for checking the server status on the client side

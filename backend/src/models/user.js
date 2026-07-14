@@ -1,6 +1,6 @@
-const { Schema,model } = require('mongoose');
+const { Schema, model } = require('mongoose');
 const validator = require('validator');
-
+const bcrypt = require('bcrypt')
 const userSchema = new Schema({
     'firstName': {
         type: String,
@@ -16,10 +16,11 @@ const userSchema = new Schema({
     },
     'lastName': {
         type: String,
+        maxLength: 50,
         trim: true,
         validate(value) {
-            if(!value) return //varna "lastName" : "" , pe ye validation chala deta hai not required me ye sirf "lastName" : undefined he mangta hai 
-            if (!validator.isAlpha(value, 'en-US', { ignore:  ' ' })) {
+            if (!value) return //varna "lastName" : "" , pe ye validation chala deta hai not required me ye sirf "lastName" : undefined he mangta hai 
+            if (!validator.isAlpha(value, 'en-US', { ignore: ' ' })) {
                 throw new Error('Last Name must only contain alphabets.')
             }
         }
@@ -30,6 +31,7 @@ const userSchema = new Schema({
         unique: true,
         lowercase: true,
         trim: true,
+        maxLength: 100,
         validate(value) {
             if (!validator.isEmail(value)) {
                 throw new Error('Provide a valid email address.')
@@ -41,14 +43,10 @@ const userSchema = new Schema({
         type: String,
         trim: true,
         required: true,
+        //we cannot put the maxLength check here cause we are using password hashing
+        //password ki maxLength API-level par 50-64 limit kar (Bcrypt ko crash hone se bachane ke liye).
         validate(value) {
-            if (!validator.isStrongPassword(value, {
-                minLength: 8,
-                minLowercase: 1,
-                minUppercase: 1,
-                minSymbols: 1,
-                minNumbers: 1
-            })) {
+            if (!validator.isStrongPassword(value)) {
                 throw new Error("Password is too weak.")
             }
         }
@@ -56,11 +54,13 @@ const userSchema = new Schema({
     },
     'age': {
         type: Number,
-        min: [18, "You Must be 18+ to use this app cause some devs do penetration testing too."]
+        min: [18, "You Must be 18+ to use this app cause some devs do penetration testing too."],
+        max: [120, "Age cannot exceed 120 years."]
 
     },
     'gender': {
         type: String,
+        required: true,
         lowercase: true,
         enum: {
             values: ['male', 'female', 'others'],
@@ -68,9 +68,62 @@ const userSchema = new Schema({
             message: `{VALUE} not allowed only male, female and others are allowed.`
         }
     }
+    , 'photoUrl': {
+        type: String,
+        trim: true,
+        default: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png',
+        // photoUrl ki maxLength Schema-level par 500-1000 limit kar (Storage abuse rokne ke liye).
+        maxLength: 1000,
+        validate(value) {
+            if (value && !validator.isURL(value, { require_protocol: true })) {
+                throw new Error('Invalid Photo URL. Must include http/https.')
+            }
+        }
+    },
+    'skills': {
+        type: [String],
+        validate: {
+            validator: function (arr) {
+                // Array length check (max 15 skills)
+                if (arr.length > 15) return false;
+                // String length check inside array (max 30 chars per skill)
+                return arr.every(s => s.length <= 30);
+            },
+            message: 'Skills array cannot exceed 15 items, and each skill must be under 30 characters.'
+        }
+    },
+    'about': {
+        type: String,
+        trim: true,
+        maxLength: [2000, 'About is too big.'] // Prevent DB DoS
+    }
+
 }, {
     timestamps: true
 })
 
-const User = model('User',userSchema);
+//* why we did it cause I don't want to send password to the user after the post request 
+// what happen here when we do newUser.save() this save method return us the promise resolving with the mongoose object 
+// baaki ke function jo direct model pe chalte hai na ke model ke instance pe vo to query object he return karte hai to unpar select lag jata hai 
+// not the object and when send this object with res.json({data : savedUser}) mongoose run this toJSON() function 
+// so here we are redefining this function so it will not send password to the frontend
+userSchema.methods.toJSON = function () {
+    const user = this;
+    const userObject = user.toObject();
+    const { password, ...safeObject } = userObject; //instead of using the delete userObject.password I am using destructuring
+    return safeObject
+}
+//don not use arrow function here you know why
+userSchema.pre('save', async function () {
+    const user = this;
+    //very important step
+    if (!user.isModified('password')) return
+
+    const newHashString = await bcrypt.hash(user.password, 12);
+
+    user.password = newHashString;
+
+})
+
+const User = model('User', userSchema);
 module.exports = User;

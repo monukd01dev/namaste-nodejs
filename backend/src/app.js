@@ -1,18 +1,25 @@
 require('dotenv').config()
 
 const express = require('express')
+const jwt = require('jsonwebtoken')
 const app = express()
 const { dbConnect } = require('./config')
 const { User } = require('./models')
+const validator = require('validator')
 const { signupValidator, validateEditProfileData} = require('./utils/validators')
+const {throwValidationError} = require('./utils/customErrors')
+const bcrypt = require('bcrypt')
+const cookieParser = require('cookie-parser')
+const { userAuth } = require('./middlewares/Auth')
 const PORT = process.env.PORT
+const secretKey = "@monukd01dev-have-secrete-key-for-this-token-for-you";//for jwt secretKey
 
 //TODO add the midderware that read the json from request body and convert it to the js object and put it in the req.body
 //! As we know that order matter in the express that why we put this middleware at the top of the file 
 // Middleware: Har request yahan se guzregi. 
 // Ye incoming JSON string ko pakdega, JS Object me parse karega, aur req.body me daal dega.
 app.use(express.json()) // pata hai na vo yaha koe route kyon nhi specify kiya cause we want every request to go through it same like we have did in the STATION 1
-
+app.use(cookieParser())
 
 // ---------------------------------------------------------
 // STATION 1: The Global Logger
@@ -69,58 +76,13 @@ app.post('/api/v1/signup', async (req, res) => {
     }
 })
 
-// TODO Get method to get user with the user email cause email is also unique usind _id is not the food option here 
-//? get router creation.md pad lena theek hai usme sahi se explain kiya hua hai 
 
-app.get('/api/v1/user', async (req, res) => {
-
-    try {
-        const email = req.body?.emailId;
-        //*checking the email from req
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "emailId is required",
-                data: null
-            })
-        }
-        //doing the db operation to find user 
-        const user = await User.findOne({ "emailId": email }).select('-_id -password')
-
-        //second check 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: `User not found with email id : ${email}`,
-                data: null
-            })
-        }
-
-        //final response sending when we got the user details  
-        return res.status(200).json({
-            success: true,
-            message: `User found with email id : ${email}`,
-            data: user
-        })
-
-    }
-    catch (error) {
-        console.log('[USER GET ERROR]: from the catch block : ', error.message)
-        return res.status(500).json({
-            success: false,
-            message: "Something went wrong on our side!!",
-            data: null,
-            error: error.message
-        })
-    }
-})//tested and working
 
 // TODO patch method to update the whitelisted fields not unique and restricted attributes like phone and password and email
 //* read the patch route creation .md file otherwise fof!
-
-app.patch('/api/v1/user', async (req, res) => {
+app.patch('/api/v1/user',userAuth, async (req, res) => {
     try {
-
+        const {user} = req; 
         const { emailId, password, ...safeFields } = req.body
 
         const cleanUpdates = validateEditProfileData(safeFields)
@@ -133,10 +95,10 @@ app.patch('/api/v1/user', async (req, res) => {
             });
         }
         //* performing the actual update 
-        const updatedUser = await User.findOneAndUpdate({ "emailId": emailId }, cleanUpdates, { "returnDocument": "after", "runValidators": true }).select('-_id -password')
+        const updatedUser = await User.findOneAndUpdate({ "emailId": user.emailId }, cleanUpdates, { "returnDocument": "after", "runValidators": true }).select('-_id ')
         // sending the not found response 
         if (!updatedUser) {
-            return res.status(404).send({
+            return res.status(404).json({
                 success: false,
                 message: "Invalid credentials!"
             });
@@ -173,34 +135,23 @@ app.patch('/api/v1/user', async (req, res) => {
 
 //TODO delete route with delete method basically it will take the email from the request body and with that it will findOneAndDelete
 //* read the delete route creation .md file otherwise fof!
-app.delete('/api/v1/user', async (req, res) => {
+app.delete('/api/v1/user',userAuth, async (req, res) => {
     try {
 
-        const email = req.body?.emailId;
+        const {user} = req;
 
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "Delete operation cannot be performed",
-                error: "emailId is required to delete",
-                data: null
-            })
-        }
-
-        const deletedUser = await User.findOneAndDelete({ "emailId": email }).select('-password');
+        const deletedUser = await User.findOneAndDelete({ "emailId": user.emailId });
 
         if (!deletedUser) {
             return res.status(404).json({
                 success: false,
-                message: 'user not founded to be deleted',
-                data: null,
-                error: `user doesn't exist's with EmailId : ${email}`
+                message: 'invalid credentials',
             })
         }
 
         return res.status(200).json({
             success: true,
-            message: `User with EmailId : ${email} is deleted successfully!!`,
+            message: `User with EmailId : ${user.emailId} is deleted successfully!!`,
             data: deletedUser,
             error: null
         })
@@ -217,9 +168,9 @@ app.delete('/api/v1/user', async (req, res) => {
 })
 
 //TODO Feed route to get all users
-app.get('/api/v1/feed', async (req, res) => {
+app.get('/api/v1/feed',userAuth, async (req, res) => {
     try {
-        const feed = await User.find({}).select('-_id -password -__v -createdAt -updatedAt')
+        const feed = await User.find({}).select('-_id -__v -createdAt -updatedAt')
         if (feed.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -246,7 +197,103 @@ app.get('/api/v1/feed', async (req, res) => {
     }
 })
 
+// ! Ep-11 code starts here 
+// TODO Login API
+app.get('/api/v1/login', async(req,res)=>{
 
+    try {
+
+        const {emailId,password} = req.body;
+
+        //validation checks for emailId and password
+        if(!emailId || typeof emailId !== 'string' || emailId.trim().length > 100 || !validator.isEmail(emailId.trim()))
+            throwValidationError('Invalid Credentials')
+
+
+        if(!password || typeof password !== 'string' || !validator.isStrongPassword(password.trim()))
+            throwValidationError('Invalid Credentials')
+        
+        //now finding the user with the given emailId here we definetly get null instead of an random user cause we have not sending email as undefined and null in any case that's why we have validation
+        const user = await User.findOne({"emailId" : emailId.trim()})
+
+        //checking is user exists or not
+        if(!user)
+            throwValidationError("Invalid Credentials")
+
+        //now we compare the password with bcrypt
+        const isPasswordMatch = await user.isPasswordMatch(password.trim())
+
+        if(!isPasswordMatch){
+            throwValidationError('Invalid Credentials')
+        }
+
+        //jwt after validation 
+        
+        const payLoad = {"_id" : user._id};
+
+        //token generation
+        const token = await user.getJwtToken()
+        //before sending the cookie
+
+        res.cookie('token',token)
+
+        res.status(200).json({
+            success: true,
+            message : "Login Successfull"
+        })
+
+    } catch (error) {
+
+        console.log('[USER LOGIN ERROR]: from the catch block : ', error.message)
+
+        if(error.name === 'ValidationError'){
+            return res.status(400).json({
+                success : false,
+                message : "Invalid Credentials"
+            })
+        }
+        
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong on our side!!",
+            data: null,
+            error: error.message
+        })
+    }
+})
+
+// TODO Get method to get user with the user email cause email is also unique usind _id is not the food option here 
+//? get router creation.md pad lena theek hai usme sahi se explain kiya hua hai 
+app.get('/api/v1/user/profile',userAuth, async (req, res) => {
+
+    try {
+        const {user} = req;
+
+        
+        console.log(user.firstName + " Have maded the request to profile")
+
+        //final response sending when we got the user details  
+        return res.status(200).json({
+            success: true,
+            message: `User found Successfully`,
+            data: user,
+        })
+
+    }
+    catch (error) {
+
+        console.log('[USER GET ERROR]: from the catch block : ', error.message)
+
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong on our side!!",
+            data: null,
+            error: error.message
+        })
+    }
+})//tested and working
+
+// ! Ep-11 code ends here 
 
 
 // ---------------------------------------------------------

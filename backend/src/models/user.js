@@ -1,6 +1,8 @@
 const { Schema, model } = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+
 const userSchema = new Schema({
     'firstName': {
         type: String,
@@ -107,12 +109,26 @@ const userSchema = new Schema({
 // baaki ke function jo direct model pe chalte hai na ke model ke instance pe vo to query object he return karte hai to unpar select lag jata hai 
 // not the object and when send this object with res.json({data : savedUser}) mongoose run this toJSON() function 
 // so here we are redefining this function so it will not send password to the frontend
+//! Schema Methods
 userSchema.methods.toJSON = function () {
     const user = this;
     const userObject = user.toObject();
     const { password, ...safeObject } = userObject; //instead of using the delete userObject.password I am using destructuring
     return safeObject
 }
+userSchema.methods.getJwtToken = async function(){
+    const user = this;
+    const token = await jwt.sign({"_id" : user._id},process.env.JWT_TOKEN_KEY,{"expiresIn" : process.env.JWT_TOKEN_EXPIRY_TIME})
+    return token;
+}
+
+userSchema.methods.isPasswordMatch = async function(userGivenPassword){
+    const user = this;
+    const userPasswordHash = user.password; 
+    const isMatched = await bcrypt.compare(userGivenPassword.trim(),userPasswordHash)
+    return isMatched
+}
+
 //don not use arrow function here you know why
 userSchema.pre('save', async function () {
     const user = this;

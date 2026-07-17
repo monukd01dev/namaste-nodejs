@@ -1,51 +1,46 @@
-
 const jwt = require('jsonwebtoken')
-const {User} = require('../../models')
+const { User } = require('../../models')
+const { AppError } = require('../../utils/customErrors'); // Tera custom error class
+const { StatusCodes } = require('http-status-codes');
 
-async function userAuth (req,res,next){
+async function userAuth (req, res, next) {
+    try {
+        // 1. Token nikalna
+        const { token } = req.cookies;
 
-    try{
-
-        // get the jwtToken from the cookie
-        const {token} = req.cookies;
-
-        if(!token) throw new Error("Invalid Token Please Login Again")
-
-        //verify the token 
-        const jwtPayload = jwt.verify(token , process.env.JWT_TOKEN_KEY)
-        
-        //extracting the user for the _id we got inside the jwtPayload
-        const {_id} = jwtPayload;
-        const user = await User.findById(_id);
-        if(!user){
-            res.clearCookie("token")
-            throw new Error("User no longer exists. Session cleared.");
+        if (!token) {
+            throw new AppError("Invalid Token. Please Login Again", StatusCodes.UNAUTHORIZED);
         }
 
-        // and if we got the user then we log the name of the user and send its the 
-        //attaching the user in the request body so the handler get the user to and i have to find the user only once
+        // 2. Token verify karna
+        const jwtPayload = jwt.verify(token, process.env.JWT_TOKEN_KEY);
+        const { _id } = jwtPayload;
+        
+        // 3. User dhoondhna
+        const user = await User.findById(_id);
+        if (!user) {
+            res.clearCookie("token");
+            throw new AppError("User no longer exists. Session cleared.", StatusCodes.UNAUTHORIZED);
+        }
+
+        // 4. Sab theek hai toh aage bhej do
         req.user = user;
         return next();
-    }catch(error){
 
-        console.log(`[USER AUTH LOG] : user credentials doesn't match`)
+    } catch (error) {
+        // 🚨 MAGIC: Ab hum yahan res.status() nahi likhenge!
         
+        // Agar error JWT ki taraf se aaya hai, toh usko pakad kar AppError me convert karo
         if (error.name === 'TokenExpiredError') {
-            // Token expire ho gaya
-            return res.status(401).send("Session Expired! Please login again.");
+            return next(new AppError("Session Expired! Please login again.", StatusCodes.UNAUTHORIZED));
         } 
-        
         if (error.name === 'JsonWebTokenError') {
-            // Token manipulate hua hai ya invalid hai
-            return res.status(401).send("Invalid Token! Unauthorized access.");
+            return next(new AppError("Invalid Token! Unauthorized access.", StatusCodes.UNAUTHORIZED));
         }
 
-
-        return res.status(401).json({
-            'error' : error.message
-        })
+        // Agar koi aur anjaan error hai (jaise Database crash), toh seedha next me daal do
+        next(error);
     }
-
 }
 
 module.exports = {

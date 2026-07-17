@@ -97,6 +97,7 @@ const userSchema = new Schema({
     'about': {
         type: String,
         trim: true,
+        default : 'The Engineer you always wanted',
         maxLength: [2000, 'About is too big.'] // Prevent DB DoS
     }
 
@@ -104,16 +105,12 @@ const userSchema = new Schema({
     timestamps: true
 })
 
-//* why we did it cause I don't want to send password to the user after the post request 
-// what happen here when we do newUser.save() this save method return us the promise resolving with the mongoose object 
-// baaki ke function jo direct model pe chalte hai na ke model ke instance pe vo to query object he return karte hai to unpar select lag jata hai 
-// not the object and when send this object with res.json({data : savedUser}) mongoose run this toJSON() function 
-// so here we are redefining this function so it will not send password to the frontend
+
 //! Schema Methods
 userSchema.methods.toJSON = function () {
     const user = this;
     const userObject = user.toObject();
-    const { password, ...safeObject } = userObject; //instead of using the delete userObject.password I am using destructuring
+    const { password,__v, ...safeObject } = userObject; //instead of using the delete userObject.password I am using destructuring
     return safeObject
 }
 userSchema.methods.getJwtToken = async function(){

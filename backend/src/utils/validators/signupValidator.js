@@ -1,4 +1,5 @@
-const { throwValidationError } = require('../customErrors');
+const { StatusCodes } = require('http-status-codes');
+const { AppError } = require('../customErrors');
 const validator = require('validator');
 
 const signupValidator = (body) => {
@@ -11,41 +12,41 @@ const signupValidator = (body) => {
 
     // firstName
     if (!firstName || typeof firstName !== 'string') {
-        throwValidationError("First Name is required and must be text!");
+        throw new AppError("First Name is required and must be text!",StatusCodes.BAD_REQUEST);
     }
     const fn = firstName.trim();
     if (fn.length < 2 || fn.length > 50 || !validator.isAlpha(fn, 'en-US', { ignore: ' ' })) {
-        throwValidationError("Invalid First Name");
+        throw new AppError("Invalid First Name",StatusCodes.BAD_REQUEST);
     }
     cleanUpdates.firstName = fn;
 
     // emailId
     if (!emailId || typeof emailId !== 'string') {
-        throwValidationError('Email is required and must be text!');
+        throw new AppError('Email is required and must be text!',StatusCodes.BAD_REQUEST);
     }
     const eid = emailId.trim();
     if (eid.length > 100 || !validator.isEmail(eid)) {
-        throwValidationError("Invalid Email!");
+        throw new AppError("Invalid Email!",StatusCodes.BAD_REQUEST);
     }
     cleanUpdates.emailId = eid;
 
     // password (ise trim nahi karte)
     if (!password || typeof password !== 'string') {
-        throwValidationError("Password is required and must be text!");
+        throw new AppError("Password is required and must be text!",StatusCodes.BAD_REQUEST);
     }
     if (!validator.isStrongPassword(password)) {
-        throwValidationError('Weak Password!');
+        throw new AppError('Weak Password!',StatusCodes.BAD_REQUEST);
     }
     cleanUpdates.password = password;
 
     // gender
     if (!gender || typeof gender !== 'string') {
-        throwValidationError("Gender is required and must be text!");
+        throw new AppError("Gender is required and must be text!",StatusCodes.BAD_REQUEST);
     }
     const g = gender.trim().toLowerCase();
-    const allowedGenders = ['male', 'female', 'other'];
+    const allowedGenders = ['male', 'female', 'others'];
     if (!allowedGenders.includes(g)) {
-        throwValidationError("Gender must be male, female, or other.");
+        throw new AppError("Gender must be male, female, or other.",StatusCodes.BAD_REQUEST);
     }
     cleanUpdates.gender = g;
 
@@ -54,11 +55,11 @@ const signupValidator = (body) => {
 
     // age
     if (age === undefined || age === null || age === '') {
-        throwValidationError("Age is required!");
+        throw new AppError("Age is required!",StatusCodes.BAD_REQUEST);
     }
     const parsedAge = Number(age);
     if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 100) {
-        throwValidationError("Age must be a valid number between 18 and 100.");
+        throw new AppError("Age must be a valid number between 18 and 100.",StatusCodes.BAD_REQUEST);
     }
     cleanUpdates.age = parsedAge;
 
@@ -67,37 +68,37 @@ const signupValidator = (body) => {
 
     // lastName
     if (lastName !== undefined) {
-        if (typeof lastName !== 'string') throwValidationError("Last Name must be text.");
+        if (typeof lastName !== 'string') throw new AppError("Last Name must be text.",StatusCodes.BAD_REQUEST);
         const ln = lastName.trim();
         if (ln.length > 50 || !validator.isAlpha(ln, 'en-US', { ignore: ' ' })) {
-            throwValidationError("Invalid Last Name");
+            throw new AppError("Invalid Last Name",StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.lastName = ln;
     }
 
     // about
     if (about !== undefined) {
-        if (typeof about !== 'string') throwValidationError("About must be text.");
+        if (typeof about !== 'string') throw new AppError("About must be text.",StatusCodes.BAD_REQUEST);
         const ab = about.trim();
-        if (ab.length > 500) throwValidationError('About section cannot exceed 500 characters.');
+        if (ab.length > 500) throw new AppError('About section cannot exceed 500 characters.',StatusCodes.BAD_REQUEST);
         cleanUpdates.about = validator.escape(ab); // XSS Protection
     }
 
     // photoUrl
     if (photoUrl !== undefined) {
-        if (typeof photoUrl !== 'string') throwValidationError("Photo URL must be text.");
+        if (typeof photoUrl !== 'string') throw new AppError("Photo URL must be text.",StatusCodes.BAD_REQUEST);
         const pu = photoUrl.trim();
         if (pu.length > 1000 || !validator.isURL(pu, { require_protocol: true })) {
-            throwValidationError('Invalid Photo URL');
+            throw new AppError('Invalid Photo URL',StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.photoUrl = pu;
     }
 
     // skills
     if (skills !== undefined) {
-        if (!Array.isArray(skills)) throwValidationError("Skills must be an array.");
+        if (!Array.isArray(skills)) throw new AppError("Skills must be an array.",StatusCodes.BAD_REQUEST);
         if (skills.length > 15 || !skills.every(e => typeof e === 'string' && e.length <= 30)) {
-            throwValidationError('Skill array is invalid or too big!');
+            throw new AppError('Skill array is invalid or too big!',StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.skills = skills;
     }

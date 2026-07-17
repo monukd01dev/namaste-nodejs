@@ -1,5 +1,6 @@
-const throwValidationError = require("./throwValidationError");
+const AppError = require("./AppError");
+
 
 module.exports = {
-    throwValidationError
+    AppError
 }

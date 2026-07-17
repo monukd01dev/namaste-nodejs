@@ -1,89 +1,83 @@
-
-const { throwValidationError } = require('../customErrors');
+const { StatusCodes } = require('http-status-codes');
+const { AppError } = require('../customErrors');
 const validator = require('validator');
 
-const validateEditProfileData = (body) => {
-    // 1. The Safe List (Email aur Password generic edit route se update nahi hone chahiye for security)
+// 💡 HELPER FUNCTION: String check aur trim ek jagah
+const getSanitizedString = (value, fieldName) => {
+    if (typeof value !== 'string') {
+        throw new AppError(`${fieldName} must be text.`,StatusCodes.BAD_REQUEST);
+    }
+    return value.trim();
+};
+
+const validateEditProfileData = (safefields) => {
     const ALLOWED_UPDATES = ["firstName", "lastName", "age", "gender", "photoUrl", "about", "skills"];
+    const incomingFields = Object.keys(safefields);
 
-    // 2. Extract incoming keys (Agar body = { age: 24, role: "admin" } aayi)
-    const incomingFields = Object.keys(body);
-
-    // 3. Strict Check: Kya incoming fields ALLOWED_UPDATES me hain?
     const isEditAllowed = incomingFields.every((field) => ALLOWED_UPDATES.includes(field));
-
     if (!isEditAllowed) {
-        throwValidationError("Invalid edit request. Unapproved fields detected!");
+        throw new AppError("Invalid edit request. Unapproved fields detected!",StatusCodes.BAD_REQUEST);
     }
 
-    // 4. Constructing the Clean Dynamic Object
     const cleanUpdates = {};
 
-    // 5. Conditional Validation (Sirf wo validate karo jo request me aaya hai)
-    if (body.firstName !== undefined) {
-        if (typeof body.firstName !== 'string' ) throwValidationError("First Name must be text.")
-        const fn = body.firstName.trim();
+    // --- REFACTORED CONDITIONAL VALIDATION ---
+
+    if (safefields.firstName !== undefined) {
+        const fn = getSanitizedString(safefields.firstName, "First Name");
         if (fn.length < 2 || fn.length > 50 || !validator.isAlpha(fn, 'en-US', { ignore: ' ' }))
-            throwValidationError("Invalid First Name");
+            throw new AppError("Invalid First Name",StatusCodes.BAD_REQUEST);
         cleanUpdates.firstName = fn;
     }
 
-    if (body.age !== undefined) {
-        const parsedAge = Number(body.age);
-        if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 100)
-            throwValidationError("Age must be a valid number between 18 and 100.");
-        cleanUpdates.age = parsedAge;
-    }
-
-    if (body.about !== undefined) {
-        if (typeof body.about !== 'string' ) throwValidationError("About must be text.")
-        const ab = body.about.trim();
-        if (ab.length > 500) throwValidationError('About section cannot exceed 500 characters.');
-        cleanUpdates.about = validator.escape(ab); // XSS Protection
-    }
-
-    if (body.lastName !== undefined) {
-        if (typeof body.lastName !== 'string' ) throwValidationError("Last Name must be text.")
-        const lastName = body.lastName.trim();
+    if (safefields.lastName !== undefined) {
+        const lastName = getSanitizedString(safefields.lastName, "Last Name");
         if (lastName.length > 50 || !validator.isAlpha(lastName, 'en-US', { ignore: ' ' })) {
-            throwValidationError("Invalid Last Name");
+            throw new AppError("Invalid Last Name",StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.lastName = lastName;
-
     }
 
-    if (body.gender !== undefined) {
-        if (typeof body.gender !== 'string' ) throwValidationError("Gender must be text.")
-        const gender = body.gender.trim().toLowerCase();
-        const allowedGenders = ['male', 'female', 'other'];
+    if (safefields.about !== undefined) {
+        const ab = getSanitizedString(safefields.about, "About section");
+        if (ab.length > 500) throw new AppError('About section cannot exceed 500 characters.',StatusCodes.BAD_REQUEST);
+        cleanUpdates.about = validator.escape(ab); 
+    }
+
+    if (safefields.gender !== undefined) {
+        const gender = getSanitizedString(safefields.gender, "Gender").toLowerCase();
+        const allowedGenders = ['male', 'female', 'others'];
         if (!allowedGenders.includes(gender)) {
-            throwValidationError("Gender must be male, female, or other.");
+            throw new AppError("Gender must be male, female, or other.",StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.gender = gender;
     }
 
-    if (body.photoUrl !== undefined) {
-        if (typeof body.photoUrl !== 'string' ) throwValidationError("Invalid Photo URL")
-        const photoUrl = body.photoUrl.trim();
+    if (safefields.photoUrl !== undefined) {
+        const photoUrl = getSanitizedString(safefields.photoUrl, "Photo URL");
         if (photoUrl.length > 1000 || !validator.isURL(photoUrl, { require_protocol: true })) {
-            throwValidationError('Invalid Photo URL');
+            throw new AppError('Invalid Photo URL',StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.photoUrl = photoUrl;
     }
 
-    if (body.skills !== undefined){
-        const skills = body.skills;
-        if (!Array.isArray(skills)) throwValidationError("Skills must be an array.");
+    if (safefields.age !== undefined) {
+        const parsedAge = Number(safefields.age);
+        if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 100)
+            throw new AppError("Age must be a valid number between 18 and 100.",StatusCodes.BAD_REQUEST);
+        cleanUpdates.age = parsedAge;
+    }
+
+    if (safefields.skills !== undefined) {
+        const skills = safefields.skills;
+        if (!Array.isArray(skills)) throw new AppError("Skills must be an array.",StatusCodes.BAD_REQUEST);
         if (skills.length > 15 || !skills.every(e => typeof e === 'string' && e.length <= 30)) {
-            throwValidationError('Skill array is invalid or too big!');
+            throw new AppError('Skill array is invalid or too big!',StatusCodes.BAD_REQUEST);
         }
         cleanUpdates.skills = skills;
     }
 
-    // 6. Return the perfectly sanitized, dynamic object
     return cleanUpdates;
 };
-
-
 
 module.exports = validateEditProfileData;

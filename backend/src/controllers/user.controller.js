@@ -3,8 +3,8 @@ const UserService = require("../services/user.service")
 
 const userFeed = async function (req, res, next) {
     try {
-        const { user } = req
-        const feed = await UserService.getFeed(user)
+        const loggedInUser = req.user;
+        const feed = await UserService.getFeed(loggedInUser)
         return res.status(StatusCodes.OK).json({
             success: true,
             message: ReasonPhrases.OK,

@@ -1,9 +1,3 @@
-My bad, bhai! You are absolutely right. For a GitHub `README.md` and a professional portfolio, it needs to be 100% clean and formal English.
-
-Here is the fully translated, professional version of your API documentation. Just copy the markdown below and paste it directly into your GitHub repository!
-
----
-
 # 🚀 DevTinder API Documentation
 
 **Base URL:** `http://localhost:<PORT>/api/v1`

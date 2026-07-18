@@ -46,9 +46,11 @@ const login = async function (req, res, next) {
 }
 
 const logout = async function (req, res, next) {
-    try {
+
         // 1. Cookie ko hamesha ke liye mita do
-        res.clearCookie("token");
+        res.clearCookie("token", {
+            expires: new Date()
+        });
 
         // 2. Success response bhej do
         return res.status(StatusCodes.OK).json({
@@ -58,9 +60,6 @@ const logout = async function (req, res, next) {
             error: null
         });
 
-    } catch (error) {
-        next(error)
-    }
 }
 
 module.exports = {

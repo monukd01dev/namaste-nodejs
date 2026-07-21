@@ -29,6 +29,7 @@ const userSchema = new Schema({
     },
     'emailId': {
         type: String,
+        index : true,
         required: true,
         unique: true,
         lowercase: true,
@@ -105,6 +106,8 @@ const userSchema = new Schema({
     timestamps: true
 })
 
+//! compound indexing
+userSchema.index({firstName: 1, lastName : 1})
 
 //! Schema Methods
 userSchema.methods.toJSON = function () {

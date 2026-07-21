@@ -1,8 +1,10 @@
 const express = require('express');
-const { userAuth } = require('../../middlewares/Auth');
 const UserController = require('../../controllers/user.Controller');
 const userRouter = express.Router();
 
-userRouter.get('/feed',userAuth, UserController.userFeed)
+userRouter.get('/feed', UserController.userFeed)
+userRouter.get('/connections',UserController.getConnections)
+userRouter.get('/requests/received',UserController.getReceivedRequests)
+
 
 module.exports = userRouter

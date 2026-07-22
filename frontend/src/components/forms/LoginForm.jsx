@@ -5,10 +5,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "../../validations/auth.schema";
 import { loginAPI } from "../../services/auth.service";
 import { useNavigate } from 'react-router';
+import { addUser } from "../../store/slices/userSlice";
+import { useDispatch } from "react-redux";
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate()
+  const dispatcher = useDispatch()
   // 1. Hook Form Setup with Zod
   const {
     register,
@@ -17,7 +20,11 @@ export default function LoginForm() {
     formState: { errors, isSubmitting }
   } = useForm({
     resolver: zodResolver(loginSchema),
-    mode: "onTouched" // UX Masterstroke: Focus hatne par validation hogi
+    // mode: "onTouched" // UX Masterstroke: Focus hatne par validation hogi
+    defaultValues : {
+      emailId : "rahul@email.com",
+      password : 'Password@123'
+    }
   });
 
   // 2. Mock API Call
@@ -26,7 +33,10 @@ export default function LoginForm() {
     try {
       const response = await loginAPI(data)
       console.log("Login Successfull", response)
-      navigate('/signup')
+      //adding the loggedInUser data in the userSlice
+      dispatcher(addUser(response.data))
+      navigate('/profile')
+
     } catch (error) {
 
       console.error("Login Failed:", error.message);

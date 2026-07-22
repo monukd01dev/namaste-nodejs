@@ -12,7 +12,7 @@ const signupUser = async function(userSignupData){
 const loginUser = async function(emailId,password){
 
     //finding the user finside the db from email
-    const user = await User.findOne({"emailId" : emailId})
+    const user = await User.findOne({"emailId" : emailId}).select("firstName emailId gender photoUrl password")
     //checking if the user exist or not 
     if(!user) throw new AppError("Invalid credentials",StatusCodes.UNAUTHORIZED);
 
@@ -24,7 +24,7 @@ const loginUser = async function(emailId,password){
     // token generate karenge yaha pe
     const token = await user.getJwtToken()
 
-    return token
+    return {token,user}
 }
 
 

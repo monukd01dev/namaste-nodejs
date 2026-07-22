@@ -3,6 +3,11 @@ const { AppError } = require("../customErrors");
 const validator = require("validator"); // Assuming you have this imported
 
 const loginValidator = function (loginInfo) {
+
+    if (!loginInfo || typeof loginInfo !== 'object' || Array.isArray(loginInfo)) {
+        throw new AppError("Invalid request payload! Expected a JSON object.",StatusCodes.BAD_REQUEST);
+    }
+
     const { emailId, password } = loginInfo;
 
     // 1. Email Validation (Saari conditions ek hi IF block me merge kar di)

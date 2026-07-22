@@ -1,7 +1,7 @@
 import { z } from 'zod'; 
 
 export const loginSchema = z.object({
-    email: z
+    emailId: z
         .string().min(1,'Reguired')
         .trim()
         .toLowerCase()

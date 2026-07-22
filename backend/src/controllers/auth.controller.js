@@ -28,14 +28,14 @@ const login = async function (req, res, next) {
 
         // validate the login infor by extracting the email and password from the req.body
         const { emailId, password } = loginValidator(req.body);
-        const token = await AuthService.loginUser(emailId, password);
+        const {token,user} = await AuthService.loginUser(emailId, password);
 
         //setting the cookies here 
         res.cookie("token", token)
         return res.status(StatusCodes.OK).json({
             success: true,
             message: ReasonPhrases.OK,
-            data: null,
+            data: user,
             error: null
         })
 

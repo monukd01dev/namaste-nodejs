@@ -5,7 +5,7 @@ function Main() {
   return (
     <div className='flex flex-col h-screen'>
       <Navbar />
-      <div className="grow">
+      <div className="grow  flex items-center justify-center">
         <Outlet />
       </div>
       <Footer />

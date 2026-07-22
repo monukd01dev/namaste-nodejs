@@ -1,9 +1,12 @@
 
-
+import LoginForm from "./forms/LoginForm"
 function Login() {
+
+
+
   return (
     <div>
-      Login
+      <LoginForm/>
     </div>
   )
 }
